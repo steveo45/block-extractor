@@ -54,12 +54,12 @@ def BlockExtractor():
     def get_txid_chunks(get_block_result, chunk_size) -> list[list[str]]:
         txids = get_block_result['tx']
         chunks = [txids[i:i + chunk_size] for i in range(0, len(txids), chunk_size)]
+        print(f"Extracted {len(txids)} txids into {len(chunks)} chunks of size {chunk_size}")
         return chunks
 
     @task
     def calculate_fee_rates(txids: list[str]) -> list[float]:
-        rpc_url = "https://special-indulgent-darkness.btc.quiknode.pro/2386795a83ca78b965d15570b031b5b8c05b6a46/"
-        headers = {'content-type': 'application/json'}
+        print(f"Calculating fee rates for {len(txids)} txids")
         fee_rates = []
         for txid in txids:
             payload = json.dumps({
@@ -69,14 +69,17 @@ def BlockExtractor():
             })
             response = requests.post(rpc_url, headers=headers, data=payload)
             tx = response.json()['result']
-
-            if 'fee' in tx:
-                fee_rate = tx['fee'] / tx['vsize']
-                fee_rates.append(fee_rate)
-            else:
-                fee_rate = None
-
+            if 'fee' not in tx or 'vsize' not in tx:
+                print(f"Skipping txid {txid} with missing fee or vsize")
+                continue
+            fee_rate = tx['fee'] / tx['vsize']
+            fee_rates.append(fee_rate)
         return fee_rates
+
+    @task
+    def flatten_feerates(feerates: list[list[float]]) -> list[float]:
+        flat_feerates = [item for sublist in feerates for item in sublist]
+        return flat_feerates
 
     @task
     def calculate_median_fee_rate(fee_rates: list[float]) -> float:
@@ -84,13 +87,9 @@ def BlockExtractor():
   
     block_hash = get_block_hash()
     block = getblock(block_hash)
-    txid_chunks = get_txid_chunks(block['tx'], 50)
-    # aggregated_feerates = []
-    # for chunk in enumerate(txid_chunks):
-    #     fee_rates = calculate_fee_rates(chunk)
-    #     aggregated_feerates.extend(fee_rates)
-    # median_fee_rate = calculate_median_fee_rate(aggregated_feerates)
-    # print(f"Median fee rate for block {block_height} is {median_fee_rate}")
+    chunks = get_txid_chunks(block, 50)
+    fee_rates = calculate_fee_rates.partial().expand(txids=chunks)
+    median_fee_rate = calculate_median_fee_rate(flatten_feerates(fee_rates))
 
 # instantiate the DAG
 BlockExtractor()
