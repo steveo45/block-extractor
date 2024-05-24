@@ -6,14 +6,13 @@ Open Notify API and prints each astronaut's name and flying craft.
 """
 
 from airflow import Dataset
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from pendulum import datetime
 import requests
 import json
 from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
 
-block_height = 839848
 rpc_url = "https://special-indulgent-darkness.btc.quiknode.pro/2386795a83ca78b965d15570b031b5b8c05b6a46/"
 headers = {'content-type': 'application/json'}
 
@@ -30,7 +29,7 @@ headers = {'content-type': 'application/json'}
 )
 def BlockExtractor():
     @task
-    def get_block_hash():
+    def get_block_hash(block_height):
         payload = json.dumps({
             "method": 'getblockhash',
             "params": [block_height],
@@ -85,11 +84,17 @@ def BlockExtractor():
     def calculate_median_fee_rate(fee_rates: list[float]) -> float:
         return sorted(fee_rates)[len(fee_rates) // 2]
   
-    block_hash = get_block_hash()
-    block = getblock(block_hash)
-    chunks = get_txid_chunks(block, 50)
-    fee_rates = calculate_fee_rates.partial().expand(txids=chunks)
-    median_fee_rate = calculate_median_fee_rate(flatten_feerates(fee_rates))
+    # fetch block ids
+    # then expand
+    block_ids = [839848, 839849, 839850]
+
+    for block_id in block_ids:
+        block_hash = get_block_hash(block_id)
+        block = getblock(block_hash)
+        chunks = get_txid_chunks(block, 50)
+        fee_rates = calculate_fee_rates.partial().expand(txids=chunks)
+        median_fee_rate = calculate_median_fee_rate(flatten_feerates(fee_rates))
+
 
 # instantiate the DAG
 BlockExtractor()
