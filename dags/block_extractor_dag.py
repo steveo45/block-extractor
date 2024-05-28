@@ -13,7 +13,7 @@ import json
 from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
 
-rpc_url = "https://special-indulgent-darkness.btc.quiknode.pro/2386795a83ca78b965d15570b031b5b8c05b6a46/"
+rpc_url;
 headers = {'content-type': 'application/json'}
 
 
@@ -86,7 +86,7 @@ def BlockExtractor():
   
     # fetch block ids
     # then expand
-    block_ids = [839848, 839849, 839850]
+    block_ids = [839848]
 
     for block_id in block_ids:
         block_hash = get_block_hash(block_id)

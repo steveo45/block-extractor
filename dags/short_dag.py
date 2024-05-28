@@ -22,10 +22,29 @@ def parallel_task_group_example():
     def filterTransactionsFromBlock(getblockresult):
         return getblockresult['tx']
 
+    @task
+    def calculate_fee_rates(txid: str):
+        return 0.0001
+
+    @task
+    def merge_results(values):
+        # Flatten the list of lists
+        flattened = [item for sublist in values for item in sublist]
+        print(f"Merged Results: {flattened}")
+        return flattened
+
+    @task
+    def calculate_median_fee_rate(fee_rates: list[float]) -> float:
+        return sorted(fee_rates)[len(fee_rates) // 2]
 
     block_ids = getblockheights()
     # expand generates multiple parallel tasks
-    filterTransactionsFromBlock.expand(getblockresult=getblock.expand(block_hash=getblockhash.expand(block_id=block_ids)))
+    calculated_values = calculate_fee_rates.expand(txid=filterTransactionsFromBlock.expand(getblockresult=getblock.expand(block_hash=getblockhash.expand(block_id=block_ids))))
+    flattened_fee_rates = merge_results(calculated_values)
+    print(flattened_fee_rates)
+    median_fee_rate = calculate_median_fee_rate(flattened_fee_rates)
+    print(median_fee_rate)
+
 
 # Instantiate the DAG
 dag = parallel_task_group_example()
